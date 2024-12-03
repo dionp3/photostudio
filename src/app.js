@@ -2,9 +2,9 @@ const express = require("express");
 const cors = require("cors");
 const dotenv = require("dotenv");
 const bodyParser = require("body-parser");
-const userRoutes = require("./src/routes/userRoutes");
-const adminRoutes = require("./src/routes/adminRoutes");
-const authenticateJWT = require("./src/middleware/auth");  // Middleware JWT
+const userRoutes = require("./routes/userRoutes");
+const adminRoutes = require("./routes/adminRoutes");
+const authenticateJWT = require("./middleware/auth");  // Middleware JWT
 
 dotenv.config();
 
