@@ -1,17 +1,14 @@
--- Tabel Client
-CREATE TABLE Client (
-    ID_Client SERIAL PRIMARY KEY,
-    Nama VARCHAR(100) NOT NULL,
-    No_Telp VARCHAR(15) NOT NULL,
-    Email VARCHAR(100) NOT NULL UNIQUE
-);
+CREATE DATABASE photostudio;
 
--- Tabel Admin
-CREATE TABLE Admin (
-    ID_Admin SERIAL PRIMARY KEY,
+\c photostudio;
+
+-- Tabel Users
+CREATE TABLE Users (
+    ID_User SERIAL PRIMARY KEY,
     Nama VARCHAR(100) NOT NULL,
-    No_Telp VARCHAR(15) NOT NULL,
-    Email VARCHAR(100) NOT NULL UNIQUE
+    Email VARCHAR(100) NOT NULL UNIQUE,
+    Password VARCHAR(255) NOT NULL,
+    Role VARCHAR(20) NOT NULL CHECK (Role IN ('Admin', 'Client'))
 );
 
 -- Tabel Studio
@@ -75,18 +72,18 @@ CREATE TABLE Pembayaran (
 ALTER TABLE Studio ADD COLUMN ID_Admin INT REFERENCES Admin(ID_Admin) ON DELETE SET NULL;
 ALTER TABLE Photographer ADD COLUMN ID_Admin INT REFERENCES Admin(ID_Admin) ON DELETE SET NULL;
 
--- Tabel Client
-INSERT INTO Client (Nama, No_Telp, Email)
+-- Menambahkan Admin
+INSERT INTO Users (Nama, Email, Password, Role)
 VALUES
-('John Doe', '081234567890', 'john.doe@example.com'),
-('Jane Smith', '081987654321', 'jane.smith@example.com'),
-('Robert Brown', '081112223334', 'robert.brown@example.com');
+('Admin Satu', 'admin1@example.com', 'hashed_password_1', 'Admin'),
+('Admin Dua', 'admin2@example.com', 'hashed_password_2', 'Admin');
 
--- Tabel Admin
-INSERT INTO Admin (Nama, No_Telp, Email)
+-- Menambahkan Client
+INSERT INTO Users (Nama, Email, Password, Role)
 VALUES
-('Admin 1', '085111223344', 'admin1@example.com'),
-('Admin 2', '085555666777', 'admin2@example.com');
+('User Satu', 'user1@example.com', 'hashed_password_3', 'Client'),
+('User Dua', 'user2@example.com', 'hashed_password_4', 'Client');
+
 
 -- Tabel Studio
 INSERT INTO Studio (Fasilitas, Biaya, Ketersediaan, Kapasitas, ID_Admin)
