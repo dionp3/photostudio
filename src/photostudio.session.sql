@@ -20,6 +20,7 @@ CREATE TABLE Studio (
     Kapasitas INT NOT NULL
 );
 
+-- Tabel Peralatan
 CREATE TABLE Peralatan (
     ID_Peralatan SERIAL PRIMARY KEY,
     Nama VARCHAR(100) NOT NULL,
@@ -50,9 +51,19 @@ CREATE TABLE Reservasi (
     Waktu_Selesai TIME NOT NULL
 );
 
+-- Tabel Sewa
+CREATE TABLE Sewa (
+    ID_Sewa SERIAL PRIMARY KEY,
+    ID_Client INT REFERENCES Client(ID_Client) ON DELETE CASCADE,
+    ID_Peralatan INT REFERENCES Peralatan(ID_Peralatan) ON DELETE CASCADE,
+    Tanggal_Peralatan DATE NOT NULL,
+    Waktu_Mulai TIME NOT NULL,
+    Waktu_Selesai TIME NOT NULL
+);
+
 -- Tabel Pesan (untuk Photographer)
 CREATE TABLE Pesan (
-    ID_Sewa SERIAL PRIMARY KEY,
+    ID_Pesan SERIAL PRIMARY KEY,
     ID_Client INT REFERENCES Client(ID_Client) ON DELETE CASCADE,
     ID_Photographer INT REFERENCES Photographer(ID_Photographer) ON DELETE CASCADE,
     Tanggal_Pesan DATE NOT NULL,

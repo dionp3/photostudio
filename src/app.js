@@ -1,45 +1,32 @@
-const express = require("express");
-const cors = require("cors");
-const dotenv = require("dotenv");
-const bodyParser = require("body-parser");
-const authRoutes = require("./routes/authRoutes");
-const userRoutes = require("./routes/userRoutes");
-const adminRoutes = require("./routes/adminRoutes");
-const { authenticateToken, authorizeAdmin } = require("./middleware/auth"); // Middleware JWT
+const express = require('express');
+const bodyParser = require('body-parser');
+const dotenv = require('dotenv');
+const authRoutes = require('./routes/authRoutes');
+const userRoutes = require('./routes/userRoutes');
+const adminRoutes = require('./routes/adminRoutes');
 
 dotenv.config();
 
 const app = express();
-app.use(cors());
 app.use(bodyParser.json());
 
-// Rute untuk autentikasi
-app.use("/api/auth", authRoutes);
-
-// Rute untuk pengguna
-app.use("/api/user", userRoutes);
-
-// Rute untuk admin (dengan autentikasi JWT)
-app.use("/api/admin", adminRoutes);
-
-// Root endpoint
-app.get("/", (res) => {
-  res.send("API berjalan dengan baik!");
+app.get('/', (req, res) => {
+  res.send('Welcome to the Photo Studio API Project by Dion Prayoga');
 });
 
-// Menangani rute yang tidak ditemukan
-app.use((req, res) => {
-  res.status(404).json({ message: "Rute tidak ditemukan." });
-});
+// Routes
+app.use('/auth', authRoutes);
+app.use('/user', userRoutes);
+app.use('/admin', adminRoutes);
 
-// Menangani kesalahan umum
+// Error Handling
 app.use((err, req, res, next) => {
-  console.error(err.stack);
-  res.status(500).json({ message: "Terjadi kesalahan pada server." });
+  res.status(err.status || 500).json({
+    error: err.message || 'Internal Server Error',
+  });
 });
 
-// Menjalankan server
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
-  console.log(`Server berjalan pada port ${PORT}`);
+  console.log(`Server running on http://localhost:${PORT}`);
 });
