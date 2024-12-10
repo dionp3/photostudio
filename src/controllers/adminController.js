@@ -1,9 +1,13 @@
 const pool = require('../config/db');
 
+
+
 const handleError = (err, res, message = 'Internal Server Error') => {
   console.error(err);
   res.status(500).json({ error: message, details: err.message || err });
 };
+
+
 
 const getAllReservationsForAdmin = async (req, res) => {
   try {
@@ -23,6 +27,7 @@ const getAllReservationsForAdmin = async (req, res) => {
 };
 
 
+
 const validateStudioInputs = (studioName, studioCapacity, studioLocation, studioHourlyRate) => {
   if (!studioName || typeof studioName !== 'string') {
     return { valid: false, error: 'Studio name is required and must be a string' };
@@ -38,6 +43,8 @@ const validateStudioInputs = (studioName, studioCapacity, studioLocation, studio
   }
   return { valid: true };
 };
+
+
 
 const addStudio = async (req, res) => {
   const { studioName, studioCapacity, studioLocation, studioHourlyRate } = req.body;
@@ -62,6 +69,7 @@ const addStudio = async (req, res) => {
   }
 };
 
+
 const updateStudio = async (req, res) => {
   const { studioId, newStudioName, newStudioCapacity, newStudioLocation, newStudioHourlyRate } = req.body;
 
@@ -69,16 +77,7 @@ const updateStudio = async (req, res) => {
     return res.status(400).json({ error: 'All fields are required' });
   }
 
-  const validation = validateStudioInputs(newStudioName, newStudioCapacity, newStudioLocation, newStudioHourlyRate);
-  if (!validation.valid) return res.status(400).json({ error: validation.error });
-
   try {
-    const [studioCheck] = await pool.query('SELECT id FROM studios WHERE id = ?', [studioId]);
-    
-    if (studioCheck.length === 0) {
-      return res.status(404).json({ error: `Studio with ID ${studioId} not found` });
-    }
-
     const [result] = await pool.query('CALL update_studio(?, ?, ?, ?, ?)', [
       studioId,
       newStudioName,
@@ -87,18 +86,17 @@ const updateStudio = async (req, res) => {
       newStudioHourlyRate,
     ]);
 
-    if (result.affectedRows === 0) {
-      return res.status(404).json({ error: `Studio with ID ${studioId} could not be updated` });
-    }
-
     res.status(200).json({ message: 'Studio updated successfully' });
+
   } catch (err) {
     if (err.code === '45000') {
-      return res.status(400).json({ error: 'A studio with the new name already exists. Please choose a different name.' });
+      return res.status(404).json({ error: 'Studio not found' });
     }
+
     handleError(err, res, 'An unexpected error occurred while updating the studio');
   }
 };
+
 
 
 const deleteStudio = async (req, res) => {
@@ -124,6 +122,8 @@ const deleteStudio = async (req, res) => {
   }
 };
 
+
+
 const addEquipment = async (req, res) => {
   const { equipmentName, equipmentType, equipmentQuantity, equipmentHourlyRate } = req.body;
 
@@ -138,15 +138,6 @@ const addEquipment = async (req, res) => {
   }
 
   try {
-    const [existingEquipment] = await pool.query(
-      'SELECT 1 FROM equipments WHERE name = ?',
-      [equipmentName]
-    );
-
-    if (existingEquipment.length > 0) {
-      return res.status(400).json({ error: 'Equipment with this name already exists' });
-    }
-
     await pool.query('CALL add_equipment(?, ?, ?, ?)', [
       equipmentName,
       equipmentType,
@@ -159,9 +150,15 @@ const addEquipment = async (req, res) => {
       equipment: { name: equipmentName, type: equipmentType, quantity: equipmentQuantity, hourlyRate: equipmentHourlyRate },
     });
   } catch (err) {
+    if (err.code === '45000') {
+      return res.status(400).json({ error: err.message });
+    }
+
     handleError(err, res, 'Failed to add equipment');
   }
 };
+
+
 
 const updateEquipment = async (req, res) => {
   const { equipmentName, newEquipmentName, newEquipmentType, newEquipmentQuantity, newHourlyRate } = req.body;
@@ -181,9 +178,15 @@ const updateEquipment = async (req, res) => {
 
     res.status(200).json({ message: 'Equipment updated successfully' });
   } catch (err) {
+    if (err.code === '45000') {
+      return res.status(400).json({ error: err.message });
+    }
+
     handleError(err, res, 'Failed to update equipment');
   }
 };
+
+
 
 const deleteEquipment = async (req, res) => {
   const { equipmentName } = req.body;
@@ -204,6 +207,8 @@ const deleteEquipment = async (req, res) => {
     handleError(err, res, 'Failed to delete equipment');
   }
 };
+
+
 
 const addPhotographer = async (req, res) => {
   const { photographerName, photographerContact, photographerSpecialty, photographerHourlyRate } = req.body;
@@ -230,6 +235,8 @@ const addPhotographer = async (req, res) => {
     handleError(err, res, 'Failed to add photographer');
   }
 };
+
+
 
 const updatePhotographer = async (req, res) => {
   const { photographerName, newPhotographerName, newPhotographerContact, newPhotographerSpecialty, newPhotographerHourlyRate } = req.body;
@@ -259,6 +266,8 @@ const updatePhotographer = async (req, res) => {
   }
 };
 
+
+
 const deletePhotographer = async (req, res) => {
   const { photographerName } = req.body;
 
@@ -279,24 +288,18 @@ const deletePhotographer = async (req, res) => {
   }
 };
 
+
+
 const getPhotographers = async (req, res) => {
   try {
-    const query = `
-      SELECT 
-        photographer_id, 
-        photographer_name, 
-        photographer_contact, 
-        photographer_specialty, 
-        photographer_hourly_rate, 
-        photographer_created_at
-      FROM photographers_view_for_admin;
-    `;
-    const [photographers] = await pool.query(query);
+    const [photographers] = await pool.query('CALL get_photographers()');
+
     res.status(200).json(photographers);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 };
+
 
 
 module.exports = {

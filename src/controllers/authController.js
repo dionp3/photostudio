@@ -9,11 +9,14 @@ const register = async (req, res) => {
   const { username, email, password, role = 'user' } = req.body;
 
   try {
-    const hashedPassword = await bcrypt.hash(password, 10);
-    await pool.query('CALL registerUser(?, ?, ?, ?)', [username, email, hashedPassword, role]);
+    await pool.query('CALL registerUser(?, ?, ?, ?)', [username, email, password, role]);
     res.status(201).json({ message: 'User registered successfully' });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    if (err.sqlState === '45000') {
+      res.status(400).json({ error: err.sqlMessage });
+    } else {
+      res.status(500).json({ error: 'Internal server error' });
+    }
   }
 };
 
@@ -23,11 +26,14 @@ const registerAdmin = async (req, res) => {
   const { username, email, password, role = 'admin' } = req.body;
 
   try {
-    const hashedPassword = await bcrypt.hash(password, 10);
-    await pool.query('CALL registerUser(?, ?, ?, ?)', [username, email, hashedPassword, role]);
-    res.status(201).json({ message: 'Admin registered successfully' });
+    await pool.query('CALL registerUser(?, ?, ?, ?)', [username, email, password, role]);
+    res.status(201).json({ message: 'User registered successfully' });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    if (err.sqlState === '45000') {
+      res.status(400).json({ error: err.sqlMessage }); 
+    } else {
+      res.status(500).json({ error: 'Internal server error' });
+    }
   }
 };
 
@@ -37,33 +43,38 @@ const login = async (req, res) => {
   const { username, password } = req.body;
 
   try {
-    const [rows] = await pool.query('Call loginUser(?, ?)', [username, password]);
+    const [rows] = await pool.query('CALL loginUser(?, ?)', [username, password]);
 
     if (rows.length === 0) {
-      return res.status(404).json({ error: 'Account not found' });
+      return res.status(401).json({ error: 'Invalid username or password' });
     }
 
-    const user = rows[0];
-    const isPasswordValid = await bcrypt.compare(password, user.password);
-
-    if (!isPasswordValid) {
-      return res.status(401).json({ error: 'Invalid password' });
-    }
+    const user = rows[0]?.[0];  
 
     const token = jwt.sign(
-      { id: user.id, role: user.role },
+      { id: user.id, role: user.role },  
       process.env.JWT_SECRET,
-      { expiresIn: '1h' }
+      { expiresIn: '1h' }  
     );
 
     res.cookie('authToken', token, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      maxAge: 3600000,
+      secure: process.env.NODE_ENV === 'production',  
+      maxAge: 3600000,  
       sameSite: 'strict',
     });
 
-    res.json({ message: 'Login successful' });
+    res.json({
+      message: 'Login successful',
+      user: {
+        id: user.id,
+        username: user.username,
+        email: user.email, 
+        role: user.role,
+      },
+      token,  
+    });
+
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Internal server error' });
@@ -91,20 +102,54 @@ const logout = (req, res) => {
 
 
 const profile = async (req, res) => {
-  const { id } = req.user;
+  try {
+    const { id, role } = req.user;
+
+    if (!id) {
+      return res.status(400).json({ error: 'Invalid user ID' });
+    }
+
+    const [results] = await pool.query('CALL getUserById(?)', [id]);
+
+    if (!results || !results[0] || results[0].length === 0) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    const userProfile = rows[0]?.[0];
+    
+    res.status(200).json({ data: userProfile });
+  } catch (err) {
+    console.error('Error in profile method:', err);
+
+    if (err.code === 'ER_TABLEACCESS_DENIED_ERROR') {
+      return res.status(403).json({ error: 'Access to the table is denied' });
+    }
+
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
+
+
+const getProfile = async (req, res) => {
+  const userId = req.user.id;
 
   try {
-    const [rows] = await pool.query('CALL getUserById(?)', [id]);
+    const [rows] = await pool.query('CALL GetUserById(?)', [userId]);
+    console.log('User ID from token:', req.user.id);
+
 
     if (rows.length === 0) {
       return res.status(404).json({ error: 'User not found' });
     }
 
-    const { password, ...userProfile } = rows[0];
-    res.json({ data: userProfile });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: err.message });
+    const user = rows[0]; 
+    
+    return res.json({ user });
+  } catch (error) {
+    console.error('Error fetching user profile:', error);
+    
+    return res.status(500).json({ error: 'Internal server error' });
   }
 };
 
@@ -171,18 +216,20 @@ const editProfile = async (req, res) => {
   const userId = req.user.id;
 
   try {
-    let hashedPassword = null;
-
-    if (password) {
-      hashedPassword = await bcrypt.hash(password, 10);
-    }
-
-    await pool.query('CALL editProfile(?, ?, ?, ?)', [userId, username, email, hashedPassword]);
+    await pool.query('CALL editProfile(?, ?, ?, ?)', [
+      userId,
+      username,
+      email,
+      password || null, 
+    ]);
 
     res.status(200).json({
       message: 'Profile updated successfully.',
     });
   } catch (error) {
+    if (error.sqlState === '45000') {
+      return res.status(400).json({ error: error.sqlMessage });
+    }
     console.error(error);
     res.status(500).json({ error: 'Failed to update profile' });
   }
@@ -196,6 +243,7 @@ module.exports = {
   login,
   logout,
   profile,
+  getProfile,
   deleteAccount,
   requestForgotPassword,
   forgotPassword,

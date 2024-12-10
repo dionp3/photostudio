@@ -5,7 +5,7 @@ const {
     register, 
     registerAdmin, 
     logout, 
-    profile, 
+    getProfile,
     deleteAccount, 
     requestForgotPassword, 
     forgotPassword, 
@@ -17,7 +17,7 @@ router.post('/register', register);
 router.post('/registerAdmin', authenticate, authorizeAdmin, registerAdmin);
 router.post('/login', login);
 router.post('/logout', logout);
-router.get('/profile', authenticate, profile);
+router.get('/profile', authenticate, getProfile);
 router.put('/editProfile', authenticate, editProfile);
 router.delete('/delete', authenticate, deleteAccount);
 router.post('/requestForgotPW', requestForgotPassword);
