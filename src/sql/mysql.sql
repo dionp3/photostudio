@@ -580,6 +580,49 @@ END;
 
 
 
+CREATE FUNCTION calculate_total_cost(p_studio_id INT, p_start_time DATETIME, p_end_time DATETIME)
+RETURNS DECIMAL(10,2)
+BEGIN
+  DECLARE v_hourly_rate DECIMAL(10, 2);
+  DECLARE v_duration_in_hours DECIMAL(10, 2);
+  DECLARE v_total_cost DECIMAL(10, 2);
+
+  SELECT hourly_rate INTO v_hourly_rate
+  FROM studios
+  WHERE id = p_studio_id;
+
+  SET v_duration_in_hours = TIMESTAMPDIFF(SECOND, p_start_time, p_end_time) / 3600;
+
+  SET v_total_cost = v_hourly_rate * v_duration_in_hours;
+
+  RETURN v_total_cost;
+END;
+
+
+
+CREATE TRIGGER check_studio_availability
+BEFORE INSERT ON studio_reservations
+FOR EACH ROW
+BEGIN
+  IF EXISTS (SELECT 1 FROM studio_reservations
+             WHERE studio_id = NEW.studio_id
+             AND (NEW.start_time < end_time AND NEW.end_time > start_time)) THEN
+    SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Studio is already reserved for the selected time range';
+  END IF;
+END;
+
+
+
+CREATE TRIGGER update_reservation_status
+AFTER UPDATE ON studio_reservations
+FOR EACH ROW
+BEGIN
+  IF NEW.payment_status = 'completed' AND NEW.reservation_status = 'pending' THEN
+    UPDATE studio_reservations
+    SET reservation_status = 'confirmed'
+    WHERE id = NEW.id;
+  END IF;
+END;
 
 
 
