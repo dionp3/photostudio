@@ -4,45 +4,34 @@ const {
   addStudio, 
   updateStudio, 
   deleteStudio, 
-  viewStudio, 
   addEquipment, 
   updateEquipment, 
   deleteEquipment, 
-  viewEquipment, 
   addPhotographer,
   updatePhotographer,
   deletePhotographer,
-  viewPhotographer,
-  getAllAuditLogs,
-  getAuditLogById 
+  getPhotographers,
+  getAllReservationsForAdmin
 } = require('../controllers/adminController.js');
 const router = express.Router();
 
-// Route untuk halaman dashboard admin
 router.get('/dashboard', authenticate, authorizeAdmin, (req, res) => {
   res.status(200).json({ message: 'Welcome to the admin dashboard!' });
 });
 
-// Studio Routes
+router.get('/reservations', authenticate, authorizeAdmin, getAllReservationsForAdmin);
+
 router.post('/studio', authenticate, authorizeAdmin, addStudio);
 router.put('/studio', authenticate, authorizeAdmin, updateStudio);
-router.delete('/studio', authenticate, authorizeAdmin, deleteStudio);
-router.get('/studio/:studioId', authenticate, authorizeAdmin, viewStudio);
+router.delete('/studio', authenticate, authorizeAdmin, deleteStudio)
 
-// Equipment Routes
 router.post('/equipment', authenticate, authorizeAdmin, addEquipment);
 router.put('/equipment', authenticate, authorizeAdmin, updateEquipment);
 router.delete('/equipment', authenticate, authorizeAdmin, deleteEquipment);
-router.get('/equipment/:equipmentId', authenticate, authorizeAdmin, viewEquipment);
 
-// Photographer Routes
+router.get('/photographers', authenticate, authorizeAdmin, getPhotographers);
 router.post('/photographer', authenticate, authorizeAdmin, addPhotographer);
 router.put('/photographer', authenticate, authorizeAdmin, updatePhotographer);
 router.delete('/photographer', authenticate, authorizeAdmin, deletePhotographer);
-router.get('/photographer/:photographerId', authenticate, authorizeAdmin, viewPhotographer);
-
-// AuditLogs
-router.get('/auditLogs',authenticate, authorizeAdmin, getAllAuditLogs); 
-router.get('/auditLogs/:id', authenticate, authorizeAdmin, getAuditLogById); 
 
 module.exports = router;

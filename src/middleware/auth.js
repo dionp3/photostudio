@@ -1,13 +1,13 @@
 const jwt = require('jsonwebtoken');
 
 const authenticate = (req, res, next) => {
-  const token = req.headers['authorization'];
+  const token = req.cookies['authToken'];
   if (!token) {
-    return res.status(401).json({ error: 'Access denied, token missing' });
+    return res.status(401).json({ error: 'Please login. Don\'t have an account? Register.' });
   }
   try {
-    const decoded = jwt.verify(token.split(' ')[1], process.env.JWT_SECRET);
-    req.user = decoded;
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    req.user = decoded; 
     next();
   } catch (error) {
     res.status(403).json({ error: 'Invalid token' });
@@ -15,10 +15,11 @@ const authenticate = (req, res, next) => {
 };
 
 const authorizeAdmin = (req, res, next) => {
-  if (req.user.role !== 'admin') {
-    return res.status(403).json({ error: 'Admin access required' });
+  if (req.user && req.user.role === 'admin') {
+    next();
+  } else {
+    res.status(403).json({ error: 'Access denied: Admins only' });
   }
-  next();
 };
 
 module.exports = { authenticate, authorizeAdmin };

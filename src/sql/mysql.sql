@@ -3,9 +3,10 @@ create database photostudio;
 use photostudio;
 
 -- Tabel Users (untuk registrasi dan login)
-CREATE TABLE users (
+CREATE or replace TABLE users (
     id INT AUTO_INCREMENT PRIMARY KEY,
     username VARCHAR(255) NOT NULL UNIQUE,
+    email VARCHAR(255) NOT NULL UNIQUE,
     password VARCHAR(255) NOT NULL,
     role ENUM('user', 'admin') DEFAULT 'user',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -14,34 +15,34 @@ CREATE TABLE users (
 -- Tabel Studios (untuk studio foto)
 CREATE TABLE studios (
     id INT AUTO_INCREMENT PRIMARY KEY,
-    admin_id INT NOT NULL,
     name VARCHAR(255) NOT NULL,
+    capacity INT NOT NULL DEFAULT 0,
     location VARCHAR(255) NOT NULL,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (admin_id) REFERENCES users(id)
+    hourly_rate DECIMAL(10, 2) NOT NULL, 
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
 -- Tabel Equipment (untuk peralatan foto)
-CREATE TABLE equipment (
+CREATE TABLE equipments (
     id INT AUTO_INCREMENT PRIMARY KEY,
-    admin_id INT NOT NULL,
     name VARCHAR(255) NOT NULL,
     type VARCHAR(255) NOT NULL,
     quantity INT DEFAULT 1,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (admin_id) REFERENCES users(id)
+    hourly_rate DECIMAL(10, 2) NOT NULL, 
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
 -- Tabel Photographers (untuk fotografer)
 CREATE TABLE photographers (
     id INT AUTO_INCREMENT PRIMARY KEY,
-    admin_id INT NOT NULL,
     name VARCHAR(255) NOT NULL,
     contact VARCHAR(255) NOT NULL,
     specialty VARCHAR(255),
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (admin_id) REFERENCES users(id)
+    hourly_rate DECIMAL(10, 2) NOT NULL, 
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+
+
 
 -- Tabel Reservations (untuk reservasi studio)
 CREATE TABLE reservations (
@@ -50,10 +51,43 @@ CREATE TABLE reservations (
     studio_id INT NOT NULL,
     start_time DATETIME NOT NULL,
     end_time DATETIME NOT NULL,
+    total_cost DECIMAL(10, 2) DEFAULT 0, -- Total biaya reservasi
+    status ENUM('pending', 'confirmed', 'canceled') DEFAULT 'pending',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (user_id) REFERENCES users(id),
     FOREIGN KEY (studio_id) REFERENCES studios(id)
 );
+
+drop table photographers;
+delete from reservations;
+delete from payment_history;
+select * from payments;
+select * from payment_history;
+
+
+-- Tabel Payments (untuk mencatat pembayaran)
+CREATE TABLE payments (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    reservation_id INT NOT NULL,
+    payment_method ENUM('credit_card', 'bank_transfer') NOT NULL, -- Metode pembayaran
+    payment_status ENUM('pending', 'completed', 'failed') DEFAULT 'pending', -- Status pembayaran
+    payment_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    amount DECIMAL(10, 2) NOT NULL, -- Jumlah yang dibayar
+    transaction_id VARCHAR(255), -- ID transaksi unik dari gateway pembayaran
+    FOREIGN KEY (reservation_id) REFERENCES reservations(id)
+);
+
+-- Tabel Pembayaran History
+CREATE TABLE payment_history (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    reservation_id INT NOT NULL,
+    amount DECIMAL(10, 2) NOT NULL,        -- Jumlah pembayaran
+    payment_method VARCHAR(50) NOT NULL,   -- Metode pembayaran (misalnya: "credit_card", "bank_transfer", "paypal")
+    payment_status ENUM('pending', 'successful', 'failed') DEFAULT 'pending',  -- Status pembayaran
+    payment_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP, -- Tanggal pembayaran
+    FOREIGN KEY (reservation_id) REFERENCES reservations(id)
+);
+
 
 -- Tabel Equipment Rentals (untuk penyewaan peralatan)
 CREATE TABLE equipment_rentals (
@@ -79,38 +113,25 @@ CREATE TABLE photographer_bookings (
     FOREIGN KEY (photographer_id) REFERENCES photographers(id)
 );
 
--- Tabel Audit Log (untuk mencatat aksi yang dilakukan oleh admin)
-CREATE TABLE audit_log (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    action VARCHAR(255) NOT NULL,
-    timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    user_id INT NOT NULL,
-    FOREIGN KEY (user_id) REFERENCES users(id)
-);
-
 -- Data -------------------------------------------------------------------
 
-INSERT INTO users (username, password, role) VALUES
-('admin1', 'adminpassword123', 'admin'),
-('user1', 'userpassword123', 'user'),
-('user2', 'userpassword456', 'user');
+INSERT INTO studios (name, capacity, location) VALUES
+('Studio A', 20, 'Jl. Studio No. 1, Jakarta'),
+('Studio B', 10, 'Jl. Foto No. 10, Bandung');
 
-INSERT INTO studios (admin_id, name, location) VALUES
-(1, 'Studio A', 'Jl. Studio No. 1, Jakarta'),
-(1, 'Studio B', 'Jl. Foto No. 10, Bandung');
 
-INSERT INTO equipment (admin_id, name, type, quantity) VALUES
-(1, 'Kamera DSLR', 'Kamera', 10),
-(1, 'Lampu Studio', 'Lampu', 5),
-(1, 'Backdrop', 'Peralatan', 3);
+INSERT INTO equipments (name, type, quantity) VALUES
+('Kamera DSLR', 'Kamera', 10),
+('Lampu Studio', 'Lampu', 5),
+('Backdrop', 'Peralatan', 3);
 
-INSERT INTO photographers (admin_id, name, contact, specialty) VALUES
-(1, 'John Doe', '081234567890', 'Fashion Photography'),
-(1, 'Jane Smith', '081987654321', 'Product Photography');
+INSERT INTO photographers (name, contact, specialty) VALUES
+('John Doe', '081234567890', 'Fashion Photography'),
+('Jane Smith', '081987654321', 'Product Photography');
 
 INSERT INTO reservations (user_id, studio_id, start_time, end_time) VALUES
-(2, 1, '2024-12-10 10:00:00', '2024-12-10 12:00:00'),
-(3, 2, '2024-12-12 14:00:00', '2024-12-12 16:00:00');
+(11, 1, '2024-12-10 10:00:00', '2024-12-10 12:00:00'),
+(11, 2, '2024-12-12 14:00:00', '2024-12-12 16:00:00');
 
 INSERT INTO equipment_rentals (user_id, equipment_id, rent_start, rent_end) VALUES
 (2, 1, '2024-12-10 09:00:00', '2024-12-10 12:00:00'),
@@ -121,22 +142,39 @@ INSERT INTO photographer_bookings (user_id, photographer_id, booking_start, book
 (3, 2, '2024-12-12 14:00:00', '2024-12-12 16:00:00');
 
 
--- auth -------------------------------------------------------------------
-DELIMITER $$ 
-CREATE PROCEDURE registerUser(
+-- auth ------------------------------------------------------------------- 
+
+CREATE OR REPLACE PROCEDURE registerUser(
     IN p_username VARCHAR(255),
+    IN p_email VARCHAR(255),
     IN p_password VARCHAR(255),
-    IN p_role ENUM('user', 'admin') DEFAULT 'user'
+    IN p_role VARCHAR(50)
 )
 BEGIN
-    -- Menyimpan user dengan role dan password yang sudah di-hash di aplikasi
-    INSERT INTO users (username, password, role)
-    VALUES (p_username, p_password, p_role);
-END $$ 
-DELIMITER ;
+    DECLARE EXIT HANDLER FOR SQLEXCEPTION
+    BEGIN
+        ROLLBACK; 
+    END;
 
-DELIMITER $$ 
-CREATE PROCEDURE loginUser(
+    START TRANSACTION;
+
+    IF EXISTS (SELECT 1 FROM users WHERE username = p_username) THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Username already exists';
+    END IF;
+
+    IF EXISTS (SELECT 1 FROM users WHERE email = p_email) THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Email already exists';
+    END IF;
+
+    INSERT INTO users (username, email, password, role)
+    VALUES (p_username, p_email, p_password, p_role);
+
+    COMMIT;
+END;
+
+
+
+CREATE OR REPLACE PROCEDURE loginUser(
     IN p_username VARCHAR(255),
     IN p_password VARCHAR(255)
 )
@@ -144,77 +182,400 @@ BEGIN
     DECLARE user_id INT;
     DECLARE user_role VARCHAR(50);
     DECLARE stored_password VARCHAR(255);
-    
-    -- Cek apakah username ada
+
+    DECLARE EXIT HANDLER FOR SQLEXCEPTION
+        ROLLBACK;
+
+    START TRANSACTION;
+
     SELECT id, password, role INTO user_id, stored_password, user_role
     FROM users
     WHERE username = p_username;
-    
-    -- Jika user ditemukan, verifikasi password di aplikasi
+
+    IF user_id IS NULL THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Invalid credentials';
+    END IF;
+
+    COMMIT;
+
     SELECT user_id AS id, user_role AS role, stored_password AS password;
-END $$ 
-DELIMITER ;
+END;
+
+
+
+CREATE OR REPLACE PROCEDURE getUserById(IN user_id INT)
+BEGIN
+  DECLARE EXIT HANDLER FOR SQLEXCEPTION
+    ROLLBACK;
+
+  START TRANSACTION;
+
+  SELECT id, username, email, password, role, created_at
+  FROM users
+  WHERE id = user_id;
+
+  COMMIT;
+END;
+
+
+
+CREATE OR REPLACE PROCEDURE deleteUserById(IN userId INT)
+BEGIN
+  DECLARE EXIT HANDLER FOR SQLEXCEPTION
+    ROLLBACK;
+
+  START TRANSACTION;
+
+  DELETE FROM users WHERE id = userId;
+
+  COMMIT;
+END;
+
+
+
+CREATE OR REPLACE PROCEDURE getUserByEmail(IN user_email VARCHAR(255))
+BEGIN
+  DECLARE EXIT HANDLER FOR SQLEXCEPTION
+    ROLLBACK;
+
+  START TRANSACTION;
+
+  SELECT id, username, email, role, created_at
+  FROM users
+  WHERE email = user_email;
+
+  COMMIT;
+END;
+
+
+
+
+CREATE OR REPLACE PROCEDURE forgotPassword(
+    IN p_email VARCHAR(255),
+    IN p_new_password VARCHAR(255)
+)
+BEGIN
+    DECLARE user_id INT;
+    DECLARE user_email VARCHAR(255);
+    DECLARE EXIT HANDLER FOR SQLEXCEPTION
+        ROLLBACK;
+
+    START TRANSACTION;
+
+    -- Mencari pengguna berdasarkan email
+    SELECT id, email INTO user_id, user_email
+    FROM users
+    WHERE email = p_email;
+
+    -- Jika pengguna tidak ditemukan, berikan error
+    IF user_id IS NULL THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Email not found';
+    END IF;
+
+    -- Mengupdate password pengguna
+    UPDATE users
+    SET password = p_new_password
+    WHERE id = user_id;
+
+    COMMIT;
+END;
+
+
+
+CREATE OR REPLACE PROCEDURE editProfile(
+    IN p_user_id INT,
+    IN p_username VARCHAR(255),
+    IN p_email VARCHAR(255),
+    IN p_password VARCHAR(255)
+)
+BEGIN
+    DECLARE EXIT HANDLER FOR SQLEXCEPTION
+        ROLLBACK;
+
+    START TRANSACTION;
+
+    -- Update username jika diberikan
+    IF p_username IS NOT NULL THEN
+        UPDATE users
+        SET username = p_username
+        WHERE id = p_user_id;
+    END IF;
+
+    -- Update email jika diberikan
+    IF p_email IS NOT NULL THEN
+        UPDATE users
+        SET email = p_email
+        WHERE id = p_user_id;
+    END IF;
+
+    -- Update password jika diberikan
+    IF p_password IS NOT NULL THEN
+        UPDATE users
+        SET password = p_password
+        WHERE id = p_user_id;
+    END IF;
+
+    COMMIT;
+END ;
+
+
+
+
 
 -- user -------------------------------------------------------------------
-CREATE VIEW studio_view AS
-SELECT s.id AS studio_id, s.name AS studio_name, s.location, s.created_at AS studio_created_at, u.username AS admin_username
-FROM studios s
-JOIN users u ON s.admin_id = u.id;
 
-CREATE VIEW equipment_view AS
-SELECT e.id AS equipment_id, e.name AS equipment_name, e.type, e.quantity, e.created_at AS equipment_created_at, u.username AS admin_username
-FROM equipment e
-JOIN users u ON e.admin_id = u.id;
-
-CREATE VIEW photographer_view AS
-SELECT p.id AS photographer_id, p.name AS photographer_name, p.contact, p.specialty, p.created_at AS photographer_created_at, u.username AS admin_username
-FROM photographers p
-JOIN users u ON p.admin_id = u.id;
-
-CREATE VIEW user_reservations_view AS
+CREATE OR REPLACE VIEW studios_view AS
 SELECT 
-  r.user_id, 
-  s.name AS studio_name, 
-  r.start_time, 
-  r.end_time
-FROM reservations r
-JOIN studios s ON r.studio_id = s.id;
+    s.id AS studio_id, 
+    s.name AS studio_name, 
+    s.capacity AS studio_capacity,
+    s.location AS studio_location, 
+    s.hourly_rate AS studio_hourly_rate,
+    DATE_FORMAT(s.created_at, '%Y-%m-%d %H:%i:%s') AS studio_created_at
+FROM studios s;
 
-DELIMITER $$
+
+
+CREATE OR REPLACE VIEW equipments_view AS
+SELECT 
+    e.id AS equipment_id, 
+    e.name AS equipment_name, 
+    e.type AS equipment_type, 
+    e.quantity AS equipment_quantity,
+    e.hourly_rate AS equipment_hourly_rate,
+    e.created_at AS equipment_created_at
+FROM equipments e;
+
+
+
+CREATE OR REPLACE VIEW photographers_view AS
+SELECT 
+    p.id AS photographer_id, 
+    p.name AS photographer_name, 
+    p.specialty AS photographer_specialty,
+    p.hourly_rate AS photographer_hourly_rate,
+    p.created_at AS photographer_created_at
+FROM photographers p;
+
+
+
+CREATE or replace VIEW photographers_view_for_admin AS
+SELECT 
+    p.id AS photographer_id, 
+    p.name AS photographer_name, 
+    p.contact AS photographer_contact, 
+    p.specialty AS photographer_specialty,
+    p.hourly_rate AS photographer_hourly_rate,
+    p.created_at AS photographer_created_at
+FROM photographers p;
+
+
+
+CREATE or replace PROCEDURE get_all_reservations()
+BEGIN
+  SELECT 
+    s.name AS studio_name, 
+    r.start_time, 
+    r.end_time
+  FROM reservations r
+  JOIN studios s ON r.studio_id = s.id;
+END ;
+
+
+
+CREATE OR REPLACE VIEW user_reservations_view AS
+SELECT r.id AS reservation_id, 
+       r.user_id,   
+       u.username, 
+       s.name AS studio_name, 
+       r.start_time, 
+       r.end_time, 
+       r.total_cost, 
+       r.status, 
+       r.created_at,
+       p.payment_status
+FROM reservations r
+JOIN users u ON r.user_id = u.id
+JOIN studios s ON r.studio_id = s.id
+LEFT JOIN payments p ON p.reservation_id = r.id;
+
+
+
+CREATE FUNCTION getTotalCost(studioId INT, startTime DATETIME, endTime DATETIME) 
+RETURNS DECIMAL(10, 2)
+DETERMINISTIC
+BEGIN
+  DECLARE hourlyRate DECIMAL(10, 2);
+  DECLARE durationHours DECIMAL(10, 2);
+
+  -- Get the hourly rate of the studio
+  SELECT hourly_rate INTO hourlyRate 
+  FROM studios 
+  WHERE id = studioId;
+
+  -- Calculate the duration of the reservation in hours
+  SET durationHours = TIMESTAMPDIFF(MINUTE, startTime, endTime) / 60;
+
+  -- Calculate total cost
+  RETURN hourlyRate * durationHours;
+END;
+
+CREATE TRIGGER beforePaymentInsert
+BEFORE INSERT ON payment_history
+FOR EACH ROW
+BEGIN
+  -- Calculate the total cost based on the reservation
+  DECLARE totalCost DECIMAL(10, 2);
+
+  -- Get the total cost from the reservation and update the payment table
+  SET totalCost = getTotalCost((SELECT studio_id FROM reservations WHERE id = NEW.reservation_id), 
+                               (SELECT start_time FROM reservations WHERE id = NEW.reservation_id), 
+                               (SELECT end_time FROM reservations WHERE id = NEW.reservation_id));
+  
+  -- Update the total cost in the payment record
+  SET NEW.amount = totalCost;
+END;
+
+
+
+
 CREATE TRIGGER after_reservation_insert
 AFTER INSERT ON reservations
 FOR EACH ROW
 BEGIN
   INSERT INTO audit_log (action, timestamp, user_id)
   VALUES ('Reservation Created', NOW(), NEW.user_id);
-END$$
-DELIMITER ;
+END;
 
-DELIMITER $$
-CREATE PROCEDURE reserve_studio (
+
+
+CREATE OR REPLACE PROCEDURE reserve_studio (
   IN userId INT,
-  IN studioId INT,
+  IN studioName VARCHAR(255),
   IN startTime DATETIME,
   IN endTime DATETIME
 )
 BEGIN
+  DECLARE studioId INT;
   DECLARE isAvailable BOOLEAN;
-  START TRANSACTION;
+  DECLARE hourlyRate DECIMAL(10, 2);
+  DECLARE totalCost DECIMAL(10, 2);
+  
+  -- Get the studio ID and hourly rate from the name
+  SELECT id, hourly_rate INTO studioId, hourlyRate
+  FROM studios
+  WHERE name = studioName;
+  
+  -- Check availability
   SELECT COUNT(*) = 0 INTO isAvailable
   FROM reservations
   WHERE studio_id = studioId
     AND (start_time < endTime AND end_time > startTime);
+  
+  -- Calculate the total cost based on the duration (in hours)
+  SET totalCost = TIMESTAMPDIFF(HOUR, startTime, endTime) * hourlyRate;
 
+  -- Reserve the studio if available
   IF isAvailable THEN
-    INSERT INTO reservations (user_id, studio_id, start_time, end_time)
-    VALUES (userId, studioId, startTime, endTime);
-    COMMIT;
+    -- Insert reservation with calculated total_cost
+    INSERT INTO reservations (user_id, studio_id, start_time, end_time, total_cost)
+    VALUES (userId, studioId, startTime, endTime, totalCost);
+
+    -- Return the reservation details
+    SELECT 
+      studioName AS reserved_studio_name,
+      startTime AS reservation_start_time,
+      endTime AS reservation_end_time,
+      totalCost AS reservation_total_cost,
+      'pending' AS status;  -- Return the default status if not explicitly set
   ELSE
-    ROLLBACK;
-    SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Studio is already reserved';
+    -- Signal an error if studio is already reserved for the time
+    SIGNAL SQLSTATE '45000' 
+    SET MESSAGE_TEXT = 'Studio is already reserved';
   END IF;
-END$$
-DELIMITER ;
+END;
+
+
+
+
+
+
+-- Stored Procedure untuk Memproses Pembayaran
+create or replace PROCEDURE process_payment(
+    IN reservationId INT,
+    IN amount DECIMAL(10, 2),
+    IN paymentMethod VARCHAR(50)
+)
+BEGIN
+    DECLARE payment_status ENUM('pending', 'completed', 'failed');
+
+    -- Proses pembayaran dan update status pembayaran
+    UPDATE payments
+    SET payment_status = 'completed', amount = amount
+    WHERE reservation_id = reservationId;
+
+    -- Ambil status pembayaran setelah update
+    SELECT payment_status
+    FROM payments
+    WHERE reservation_id = reservationId
+    LIMIT 1;
+    
+END;
+
+
+
+
+
+
+
+
+
+
+-- Trigger untuk memperbarui status reservasi ketika status pembayaran diperbarui
+CREATE OR REPLACE TRIGGER update_reservation_status_after_payment
+AFTER INSERT ON payment_history
+FOR EACH ROW
+BEGIN
+  -- Jika pembayaran berhasil, ubah status reservasi menjadi 'confirmed'
+  IF NEW.payment_status = 'successful' THEN
+    UPDATE reservations
+    SET status = 'confirmed'
+    WHERE id = NEW.reservation_id;
+  -- Jika pembayaran gagal, ubah status reservasi menjadi 'failed'
+  ELSEIF NEW.payment_status = 'failed' THEN
+    UPDATE reservations
+    SET status = 'failed'
+    WHERE id = NEW.reservation_id;
+  END IF;
+END;
+
+
+
+CREATE OR REPLACE VIEW payment_report AS
+SELECT
+    p.id AS payment_id,
+    p.payment_date,
+    s.name AS studio_name,
+    p.amount,
+    p.payment_method,
+    p.payment_status,
+    s.capacity AS studio_capacity,
+    s.location AS studio_location,
+    u.username AS user_name,
+    u.email AS user_email
+FROM
+    payments p
+JOIN
+    reservations r ON p.reservation_id = r.id
+JOIN
+    studios s ON r.studio_id = s.id
+JOIN
+    users u ON r.user_id = u.id;
+
+
+
+
+
 
 DELIMITER $$
 CREATE PROCEDURE rent_equipment (
@@ -269,40 +630,105 @@ END$$
 DELIMITER ;
 
 -- admin -------------------------------------------------------------------
-DELIMITER $$
-CREATE PROCEDURE add_studio (
-  IN adminId INT,
-  IN studioName VARCHAR(255),
-  IN studioLocation VARCHAR(255)
+
+CREATE or replace PROCEDURE get_all_reservations_for_admin()
+BEGIN
+  SELECT 
+    r.id AS reservation_id,
+    r.user_id, 
+    u.username, 
+    r.studio_id, 
+    s.name AS studio_name, 
+    r.start_time, 
+    r.end_time
+  FROM reservations r
+  JOIN studios s ON r.studio_id = s.id
+  JOIN users u ON r.user_id = u.id;
+end;
+
+
+CREATE OR REPLACE PROCEDURE add_studio (
+    IN studioName VARCHAR(255),
+    IN studioCapacity INT,
+    IN studioLocation VARCHAR(255),
+    IN studioHourlyRate DECIMAL(10, 2)
 )
 BEGIN
-  INSERT INTO studios (admin_id, name, location)
-  VALUES (adminId, studioName, studioLocation);
-END$$
-DELIMITER ;
+    -- Tangani error dengan ROLLBACK
+    DECLARE exit handler FOR SQLEXCEPTION
+    BEGIN
+        ROLLBACK; 
+    END;
 
-DELIMITER $$
+    -- Mulai transaksi
+    START TRANSACTION;
+
+    -- Insert studio baru
+    INSERT INTO studios (name, capacity, location, hourly_rate)
+    VALUES (studioName, studioCapacity, studioLocation, studioHourlyRate);
+
+    -- Commit transaksi
+    COMMIT;
+END;
+
+
+
 CREATE TRIGGER after_studio_insert
 AFTER INSERT ON studios
 FOR EACH ROW
 BEGIN
   INSERT INTO audit_log (action, timestamp, user_id)
   VALUES ('Studio Added', NOW(), NEW.admin_id);
-END$$
-DELIMITER ;
+END ;
 
-DELIMITER $$
-CREATE PROCEDURE update_studio(
+
+
+CREATE OR REPLACE PROCEDURE update_studio(
   IN studioId INT,
-  IN studioName VARCHAR(255),
-  IN studioLocation VARCHAR(255)
+  IN newStudioName VARCHAR(255),
+  IN newStudioCapacity INT,
+  IN newStudioLocation VARCHAR(255),
+  IN newStudioHourlyRate DECIMAL(10, 2)
 )
 BEGIN
+  DECLARE studioCount INT;
+  DECLARE exit handler FOR SQLEXCEPTION
+  BEGIN
+    -- Rollback jika terjadi kesalahan
+    ROLLBACK; 
+  END;
+
+  -- Mulai transaksi
+  START TRANSACTION;
+
+  -- Cek apakah studio dengan nama baru sudah ada, kecuali untuk studio yang sedang diupdate
+  SELECT COUNT(*) INTO studioCount
+  FROM studios
+  WHERE name = newStudioName AND id != studioId;
+
+  IF studioCount > 0 THEN
+    SIGNAL SQLSTATE '45000'
+    SET MESSAGE_TEXT = 'A studio with the new name already exists.';
+  END IF;
+
+  -- Update data studio berdasarkan ID
   UPDATE studios
-  SET name = studioName, location = studioLocation
+  SET 
+    name = newStudioName, 
+    capacity = newStudioCapacity, 
+    location = newStudioLocation,
+    hourly_rate = newStudioHourlyRate
   WHERE id = studioId;
-END$$
-DELIMITER ;
+
+  -- Commit transaksi jika tidak ada masalah
+  COMMIT;
+END;
+
+
+
+
+
+
 
 DELIMITER $$
 CREATE TRIGGER after_studio_update
@@ -314,14 +740,30 @@ BEGIN
 END$$
 DELIMITER ;
 
-DELIMITER $$
-CREATE PROCEDURE delete_studio(
+
+
+
+CREATE OR REPLACE PROCEDURE delete_studio(
   IN studioId INT
 )
 BEGIN
-  DELETE FROM studios WHERE id = studioId;
-END$$
-DELIMITER ;
+  DECLARE exit handler FOR SQLEXCEPTION
+  BEGIN
+    ROLLBACK; -- Rollback transaction if an error occurs
+  END;
+
+  START TRANSACTION;
+
+  -- Hapus studio berdasarkan ID
+  DELETE FROM studios
+  WHERE id = studioId;
+
+  -- Commit transaction jika tidak ada masalah
+  COMMIT;
+END;
+
+
+
 
 DELIMITER $$
 CREATE TRIGGER after_studio_delete
@@ -342,17 +784,29 @@ BEGIN
 END$$
 DELIMITER ;
 
-DELIMITER $$
-CREATE PROCEDURE add_equipment (
-  IN adminId INT,
+
+
+
+CREATE OR REPLACE PROCEDURE add_equipment (
   IN equipmentName VARCHAR(255),
-  IN equipmentType VARCHAR(255)
+  IN equipmentType VARCHAR(255),
+  IN equipmentQuantity INT,
+  IN equipmentHourlyRate DECIMAL(10, 2)
 )
 BEGIN
-  INSERT INTO equipment (admin_id, name, type)
-  VALUES (adminId, equipmentName, equipmentType);
-END$$
-DELIMITER ;
+  DECLARE EXIT HANDLER FOR SQLEXCEPTION
+  BEGIN
+    ROLLBACK;
+  END;
+
+  START TRANSACTION;
+  INSERT INTO equipments (name, type, quantity, hourly_rate)
+  VALUES (equipmentName, equipmentType, equipmentQuantity, equipmentHourlyRate);
+  COMMIT;
+END;
+
+
+
 
 DELIMITER $$
 CREATE TRIGGER after_equipment_insert
@@ -365,18 +819,30 @@ END$$
 
 DELIMITER ;
 
-DELIMITER $$
-CREATE PROCEDURE update_equipment(
-  IN equipmentId INT,
+CREATE OR REPLACE PROCEDURE update_equipment(
   IN equipmentName VARCHAR(255),
-  IN equipmentQuantity INT
+  IN newEquipmentName VARCHAR(255),
+  IN newEquipmentType VARCHAR(255),
+  IN newEquipmentQuantity INT,
+  IN newEquipmentHourlyRate DECIMAL(10, 2)
 )
 BEGIN
-  UPDATE equipment
-  SET name = equipmentName, quantity = equipmentQuantity
-  WHERE id = equipmentId;
-END$$
-DELIMITER ;
+  DECLARE EXIT HANDLER FOR SQLEXCEPTION
+  BEGIN
+    ROLLBACK;
+  END;
+
+  START TRANSACTION;
+  UPDATE equipments
+  SET 
+    name = newEquipmentName, 
+    type = newEquipmentType, 
+    quantity = newEquipmentQuantity,
+    hourly_rate = newEquipmentHourlyRate
+  WHERE name = equipmentName;
+  COMMIT;
+END;
+
 
 DELIMITER $$
 CREATE TRIGGER after_equipment_update
@@ -387,14 +853,32 @@ BEGIN
   VALUES ('Equipment Updated', NOW(), NEW.admin_id);
 END$$
 
-DELIMITER $$
-CREATE PROCEDURE delete_equipment(
-  IN equipmentId INT
+
+
+
+CREATE OR REPLACE PROCEDURE delete_equipment(
+  IN equipmentName VARCHAR(255)
 )
 BEGIN
-  DELETE FROM equipment WHERE id = equipmentId;
-END$$
-DELIMITER ;
+  DECLARE EXIT HANDLER FOR SQLEXCEPTION
+  BEGIN
+    ROLLBACK;
+  END;
+
+  -- Mulai transaksi
+  START TRANSACTION;
+
+  -- Hapus peralatan berdasarkan nama
+  DELETE FROM equipments
+  WHERE name = equipmentName;
+
+  -- Commit transaksi jika berhasil
+  COMMIT;
+END;
+
+
+
+
 
 DELIMITER $$
 CREATE TRIGGER after_equipment_delete
@@ -415,17 +899,43 @@ BEGIN
 END$$
 DELIMITER ;
 
-DELIMITER $$
-CREATE PROCEDURE add_photographer (
-  IN adminId INT,
+
+
+
+CREATE OR REPLACE PROCEDURE add_photographer (
   IN photographerName VARCHAR(255),
-  IN photographerContact VARCHAR(255)
+  IN photographerContact VARCHAR(255),
+  IN photographerSpecialty VARCHAR(255),
+  IN photographerHourlyRate DECIMAL(10, 2)
 )
 BEGIN
-  INSERT INTO photographers (admin_id, name, contact)
-  VALUES (adminId, photographerName, photographerContact);
-END$$
-DELIMITER ;
+  DECLARE photographerExists INT DEFAULT 0;
+
+  -- Mengecek apakah fotografer dengan nama yang sama sudah ada
+  SELECT COUNT(*) INTO photographerExists
+  FROM photographers
+  WHERE name = photographerName;
+
+  -- Jika sudah ada, keluarkan error
+  IF photographerExists > 0 THEN
+    SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Photographer with this name already exists';
+  END IF;
+
+  -- Mulai transaksi
+  START TRANSACTION;
+
+  -- Menambahkan fotografer ke tabel photographers
+  INSERT INTO photographers (name, contact, specialty, hourly_rate)
+  VALUES (photographerName, photographerContact, photographerSpecialty, photographerHourlyRate);
+
+  -- Commit transaksi jika berhasil
+  COMMIT;
+END;
+
+
+
+
+
 
 DELIMITER $$
 CREATE TRIGGER after_photographer_insert
@@ -437,18 +947,36 @@ BEGIN
 END$$
 DELIMITER ;
 
-DELIMITER $$
-CREATE PROCEDURE update_photographer(
-  IN photographerId INT,
+CREATE OR REPLACE PROCEDURE update_photographer (
   IN photographerName VARCHAR(255),
-  IN photographerSpecialty VARCHAR(255)
+  IN newPhotographerName VARCHAR(255),
+  IN newPhotographerContact VARCHAR(255),
+  IN newPhotographerSpecialty VARCHAR(255),
+  IN newPhotographerHourlyRate DECIMAL(10, 2)
 )
 BEGIN
+  DECLARE EXIT HANDLER FOR SQLEXCEPTION
+  BEGIN
+    ROLLBACK;
+  END;
+
+  -- Mulai transaksi
+  START TRANSACTION;
+
+  -- Memperbarui data fotografer berdasarkan nama fotografer yang lama
   UPDATE photographers
-  SET name = photographerName, specialty = photographerSpecialty
-  WHERE id = photographerId;
-END$$
-DELIMITER ;
+  SET name = newPhotographerName, 
+      contact = newPhotographerContact, 
+      specialty = newPhotographerSpecialty,
+      hourly_rate = newPhotographerHourlyRate
+  WHERE name = photographerName;
+
+  -- Commit transaksi jika berhasil
+  COMMIT;
+END;
+
+
+
 
 DELIMITER $$
 CREATE TRIGGER after_photographer_update
@@ -460,14 +988,28 @@ BEGIN
 END$$
 DELIMITER ;
 
-DELIMITER $$
-CREATE PROCEDURE delete_photographer(
-  IN photographerId INT
+
+CREATE OR REPLACE PROCEDURE delete_photographer (
+  IN photographerName VARCHAR(255)
 )
 BEGIN
-  DELETE FROM photographers WHERE id = photographerId;
-END$$
-DELIMITER ;
+  DECLARE EXIT HANDLER FOR SQLEXCEPTION
+  BEGIN
+    ROLLBACK;
+  END;
+
+  -- Mulai transaksi
+  START TRANSACTION;
+
+  -- Menghapus fotografer berdasarkan nama
+  DELETE FROM photographers
+  WHERE name = photographerName;
+
+  -- Commit transaksi jika berhasil
+  COMMIT;
+END;
+
+
 
 DELIMITER $$
 CREATE TRIGGER after_photographer_delete
