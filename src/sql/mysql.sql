@@ -10,7 +10,7 @@ flush privileges;
 
 -- --------------------------------------------------------------------------------------------------------------------------------------
 
-CREATE or replace TABLE users (
+CREATE TABLE users (
     id INT AUTO_INCREMENT PRIMARY KEY,
     username VARCHAR(255) NOT NULL UNIQUE,
     email VARCHAR(255) NOT NULL UNIQUE,
@@ -305,8 +305,64 @@ END;
 
 
 
-
 -- user --------------------------------------------------------------------------------------------------------------------------------------
+
+CREATE OR REPLACE PROCEDURE getStudios()
+BEGIN
+  START TRANSACTION;
+
+  SELECT 
+    s.id AS studio_id, 
+    s.name AS studio_name, 
+    s.capacity AS studio_capacity,
+    s.location AS studio_location, 
+    s.hourly_rate AS studio_hourly_rate,
+    DATE_FORMAT(s.created_at, '%Y-%m-%d %H:%i:%s') AS studio_created_at
+  FROM studios s;
+
+  COMMIT;
+END;
+
+
+
+CREATE OR REPLACE PROCEDURE getEquipments()
+BEGIN
+  START TRANSACTION;
+
+  SELECT 
+    e.id AS equipment_id, 
+    e.name AS equipment_name, 
+    e.type AS equipment_type, 
+    e.quantity AS equipment_quantity,
+    e.hourly_rate AS equipment_hourly_rate,
+    DATE_FORMAT(e.created_at, '%Y-%m-%d %H:%i:%s') AS equipment_created_at
+  FROM equipments e;
+
+  COMMIT;
+END;
+
+
+
+CREATE OR REPLACE PROCEDURE getPhotographers()
+BEGIN
+  START TRANSACTION;
+
+  SELECT 
+    p.id AS photographer_id, 
+    p.name AS photographer_name, 
+    p.specialty AS photographer_specialty,
+    p.hourly_rate AS photographer_hourly_rate,
+    DATE_FORMAT(p.created_at, '%Y-%m-%d %H:%i:%s') AS photographer_created_at
+  FROM photographers p;
+
+  COMMIT;
+END;
+
+
+
+
+
+
 
 CREATE OR REPLACE PROCEDURE getStudios()
 BEGIN
@@ -388,7 +444,7 @@ SELECT
     p.name AS photographer_name, 
     p.specialty AS photographer_specialty,
     p.hourly_rate AS photographer_hourly_rate,
-    p.created_at AS photographer_created_at
+    DATE_FORMAT(p.created_at, '%Y-%m-%d %H:%i:%s') AS photographer_created_at
 FROM photographers p;
 
 
@@ -428,6 +484,44 @@ BEGIN
     WHERE r.user_id = user_id
     ORDER BY r.created_at DESC;
 END ;
+
+
+
+
+
+
+create or replace procedure get_user_studio_reservation(
+	in user_id int,
+	in studio_id int,
+	in start_time date,
+	in end_time date
+)
+BEGIN
+    SELECT 
+        r.id AS reservation_id,
+        r.user_id,
+        u.username AS user_name,
+        r.studio_id,
+        s.name AS studio_name,
+        r.start_time,
+        r.end_time,
+        r.total_cost,
+        r.payment_status,
+        r.reservation_status,
+        r.created_at AS reservation_created_at
+    FROM studio_reservations r
+    JOIN users u ON r.user_id = u.id
+    LEFT JOIN studios s ON r.studio_id = s.id
+    WHERE r.user_id = user_id
+    ORDER BY r.created_at DESC;
+END ;
+
+concat
+
+call get_user_studio_reservation(11, 12, 2024-12-22, 2024-12-22)
+
+
+
 
 
 
@@ -490,30 +584,36 @@ BEGIN
   DECLARE v_hourly_rate DECIMAL(10, 2);
   DECLARE v_duration_in_hours DECIMAL(10, 2);
   DECLARE v_total_cost DECIMAL(10, 2);
+ 
+  START TRANSACTION;
 
   SELECT hourly_rate INTO v_hourly_rate
   FROM studios
   WHERE id = p_studio_id;
 
   IF v_hourly_rate IS NULL OR v_hourly_rate <= 0 THEN
+    ROLLBACK; 
     SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Invalid hourly rate';
   END IF;
 
   SET v_duration_in_hours = TIMESTAMPDIFF(SECOND, p_start_time, p_end_time) / 3600;
 
   IF v_duration_in_hours <= 0 THEN
+    ROLLBACK; 
     SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'End time must be after start time';
   END IF;
 
   SET v_total_cost = v_hourly_rate * v_duration_in_hours;
 
   IF v_total_cost <= 0 THEN
+    ROLLBACK;  
     SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Invalid total cost calculation';
   END IF;
 
   IF EXISTS (SELECT 1 FROM studio_reservations
              WHERE studio_id = p_studio_id
              AND (p_start_time < end_time AND p_end_time > start_time)) THEN
+    ROLLBACK;  
     SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Studio is already reserved for the selected time range';
   END IF;
 
@@ -522,7 +622,9 @@ BEGIN
 
   SET p_reservation_id = LAST_INSERT_ID();
   SET p_total_cost = v_total_cost;
-END ;
+
+  COMMIT;
+END;
 
 
 
